@@ -6,7 +6,7 @@ A lightweight, scalable SMS automation platform built with Python — no paid AP
 
 ## The Problem
 
-Small organizations — churches, community groups, coaching staffs, local nonprofits — need a reliable way to send text messages to their members. Most solutions charge per message or require monthly subscriptions. For groups under 100 people, that cost adds up fast for something that should be simple.
+Small organizations, churches, community groups, coaching staffs, and local nonprofits  need a reliable way to send text messages to their members. Most solutions charge per message or require monthly subscriptions. For small communities, that cost adds up fast for something that should be simple.
 
 ## The Solution
 
