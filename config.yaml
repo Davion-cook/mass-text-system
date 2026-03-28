@@ -1,0 +1,31 @@
+# Mass Text System Configuration (Source of Truth - Ch.14)
+# All system settings defined in YAML (Ch.8)
+
+provider:
+  # Supported: email_sms, mock
+  name: email_sms
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+  email_address: "${EMAIL_ADDRESS}"
+  email_password: "${EMAIL_PASSWORD}"
+
+messaging:
+  # Rate limiting
+  max_concurrent: 10          # ThreadPoolExecutor workers (Ch.6)
+  rate_limit_per_second: 5    # Messages per second cap
+  retry_attempts: 3           # Retry on transient failures
+  retry_delay_seconds: 2      # Backoff base delay
+
+  # Batch settings
+  batch_size: 100             # Contacts per batch
+
+templates:
+  directory: "templates/"     # Jinja2 template directory (Ch.9)
+  default: "default.j2"
+
+contacts:
+  file: "contacts.yaml"       # Contact source of truth
+
+logging:
+  level: "INFO"
+  file: "logs/mass_text.log"
