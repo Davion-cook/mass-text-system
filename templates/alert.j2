@@ -1,0 +1,7 @@
+{# Alert template with urgency - Jinja2 (Ch.9) #}
+{%- if priority | default("normal") == "high" %}
+URGENT: {{ body }}
+{%- else %}
+NOTICE: {{ body }}
+{%- endif %}
+- Sent to {{ name }} ({{ role | default("staff") }})

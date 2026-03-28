@@ -1,0 +1,24 @@
+# Contacts Source of Truth (Ch.14)
+# Define contacts and groups in YAML (Ch.8)
+
+groups:
+  team_alpha:
+    - name: "Alice Johnson"
+      phone: "+15551234001"
+      role: "lead"
+    - name: "Bob Smith"
+      phone: "+15551234002"
+      role: "member"
+
+  team_beta:
+    - name: "Carol Davis"
+      phone: "+15551234003"
+      role: "lead"
+    - name: "Dave Wilson"
+      phone: "+15551234004"
+      role: "member"
+
+  all_staff:
+    - name: "Eve Martinez"
+      phone: "+15551234005"
+      role: "manager"
