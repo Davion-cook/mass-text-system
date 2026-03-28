@@ -7,7 +7,7 @@ Key techniques applied:
 - YAML for config & data (Ch.8 Data Formats)
 - Jinja2 for message templating (Ch.9 Templates)
 - ThreadPoolExecutor for parallelization (Ch.6 Python)
-- HTTP APIs via Requests library (Ch.10 Network APIs)
+- Email-to-SMS carrier gateways via smtplib
 - Source of truth pattern (Ch.14 Automation Architecture)
 """
 
@@ -23,7 +23,6 @@ from email.mime.text import MIMEText
 from pathlib import Path
 
 import yaml
-import requests
 from jinja2 import Environment, FileSystemLoader
 
 
@@ -120,7 +119,7 @@ def render_message(template_dir, template_name, context):
 
 
 # ---------------------------------------------------------------------------
-# SMS provider abstraction — API layer (Ch.10)
+# SMS provider — Email-to-SMS gateways
 # ---------------------------------------------------------------------------
 
 class SMSProvider:
@@ -128,54 +127,6 @@ class SMSProvider:
 
     def send(self, to_number, message):
         raise NotImplementedError
-
-
-class TwilioProvider(SMSProvider):
-    """Send SMS via Twilio REST API using the Requests library (Ch.10)."""
-
-    def __init__(self, account_sid, auth_token, from_number, api_url):
-        self.account_sid = account_sid
-        self.auth_token = auth_token
-        self.from_number = from_number
-        self.api_url = api_url
-
-    def send(self, to_number, message):
-        url = f"{self.api_url}/Accounts/{self.account_sid}/Messages.json"
-        payload = {
-            "To": to_number,
-            "From": self.from_number,
-            "Body": message,
-        }
-        resp = requests.post(
-            url,
-            data=payload,
-            auth=(self.account_sid, self.auth_token),
-            timeout=30,
-        )
-        resp.raise_for_status()
-        return resp.json()
-
-
-class VonageProvider(SMSProvider):
-    """Send SMS via Vonage (Nexmo) REST API (Ch.10)."""
-
-    def __init__(self, api_key, api_secret, from_number, **_kwargs):
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self.from_number = from_number
-
-    def send(self, to_number, message):
-        url = "https://rest.nexmo.com/sms/json"
-        payload = {
-            "api_key": self.api_key,
-            "api_secret": self.api_secret,
-            "to": to_number,
-            "from": self.from_number,
-            "text": message,
-        }
-        resp = requests.post(url, json=payload, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
 
 
 class EmailSMSProvider(SMSProvider):
@@ -242,20 +193,7 @@ def create_provider(config):
     provider_cfg = config["provider"]
     name = provider_cfg["name"]
 
-    if name == "twilio":
-        return TwilioProvider(
-            account_sid=provider_cfg["account_sid"],
-            auth_token=provider_cfg["auth_token"],
-            from_number=provider_cfg["from_number"],
-            api_url=provider_cfg["api_url"],
-        )
-    elif name == "vonage":
-        return VonageProvider(
-            api_key=provider_cfg["account_sid"],
-            api_secret=provider_cfg["auth_token"],
-            from_number=provider_cfg["from_number"],
-        )
-    elif name == "email_sms":
+    if name == "email_sms":
         return EmailSMSProvider(
             smtp_server=provider_cfg.get("smtp_server", "smtp.gmail.com"),
             smtp_port=int(provider_cfg.get("smtp_port", 587)),
@@ -301,7 +239,7 @@ def send_single(provider, contact, message, retry_attempts, retry_delay):
             else:
                 result = provider.send(phone, message)
             return {"contact": name, "phone": phone, "status": "sent", "result": result}
-        except (requests.exceptions.RequestException, smtplib.SMTPException, ValueError) as exc:
+        except (smtplib.SMTPException, ValueError, OSError) as exc:
             logging.warning(
                 "Attempt %d/%d failed for %s: %s", attempt, retry_attempts, name, exc
             )

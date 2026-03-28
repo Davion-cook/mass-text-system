@@ -2,19 +2,12 @@
 # All system settings defined in YAML (Ch.8)
 
 provider:
-  # Supported: twilio, vonage, email_sms, mock
+  # Supported: email_sms, mock
   name: email_sms
-  # --- Email-to-SMS settings (no API needed, works for <100 people) ---
   smtp_server: "smtp.gmail.com"
   smtp_port: 587
   email_address: "${EMAIL_ADDRESS}"
   email_password: "${EMAIL_PASSWORD}"
-  # --- Twilio settings (uncomment and set name: twilio to use) ---
-  # name: twilio
-  # account_sid: "${TWILIO_ACCOUNT_SID}"
-  # auth_token: "${TWILIO_AUTH_TOKEN}"
-  # from_number: "${TWILIO_FROM_NUMBER}"
-  # api_url: "https://api.twilio.com/2010-04-01"
 
 messaging:
   # Rate limiting
