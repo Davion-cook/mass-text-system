@@ -1,24 +1,34 @@
 # Contacts Source of Truth (Ch.14)
 # Define contacts and groups in YAML (Ch.8)
+# 'carrier' field required for email_sms provider
 
 groups:
   team_alpha:
     - name: "Alice Johnson"
       phone: "+15551234001"
+      carrier: "att"
       role: "lead"
     - name: "Bob Smith"
       phone: "+15551234002"
+      carrier: "tmobile"
       role: "member"
 
   team_beta:
     - name: "Carol Davis"
       phone: "+15551234003"
+      carrier: "verizon"
       role: "lead"
     - name: "Dave Wilson"
       phone: "+15551234004"
+      carrier: "sprint"
       role: "member"
 
   all_staff:
     - name: "Eve Martinez"
       phone: "+15551234005"
+      carrier: "att"
       role: "manager"
+
+# Supported carriers:
+#   att, tmobile, verizon, sprint, uscellular,
+#   boost, cricket, metro, mint, visible, xfinity, fi

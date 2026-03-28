@@ -15,14 +15,36 @@ import os
 import re
 import sys
 import time
+import smtplib
 import logging
 import argparse
 import concurrent.futures
+from email.mime.text import MIMEText
 from pathlib import Path
 
 import yaml
 import requests
 from jinja2 import Environment, FileSystemLoader
+
+
+# ---------------------------------------------------------------------------
+# Email-to-SMS carrier gateways
+# ---------------------------------------------------------------------------
+
+CARRIER_GATEWAYS = {
+    "att":        "txt.att.net",
+    "tmobile":    "tmomail.net",
+    "verizon":    "vtext.com",
+    "sprint":     "messaging.sprintpcs.com",
+    "uscellular": "email.uscc.net",
+    "boost":      "sms.myboostmobile.com",
+    "cricket":    "sms.cricketwireless.net",
+    "metro":      "mymetropcs.com",
+    "mint":       "tmomail.net",           # Mint runs on T-Mobile
+    "visible":    "vtext.com",             # Visible runs on Verizon
+    "xfinity":    "vtext.com",             # Xfinity Mobile runs on Verizon
+    "fi":         "msg.fi.google.com",     # Google Fi
+}
 
 
 # ---------------------------------------------------------------------------
@@ -156,10 +178,61 @@ class VonageProvider(SMSProvider):
         return resp.json()
 
 
+class EmailSMSProvider(SMSProvider):
+    """Send SMS via email-to-SMS carrier gateways — no API needed.
+
+    Uses Python's built-in smtplib to send emails to carrier gateways
+    like 5551234567@txt.att.net, which arrive as SMS on the phone.
+    Works well for under 100 recipients.
+    """
+
+    def __init__(self, smtp_server, smtp_port, email_address, email_password):
+        self.smtp_server = smtp_server
+        self.smtp_port = smtp_port
+        self.email_address = email_address
+        self.email_password = email_password
+
+    def _get_gateway_address(self, phone, carrier):
+        """Build the email address: 5551234567@txt.att.net"""
+        carrier_key = carrier.lower().replace("-", "").replace(" ", "")
+        gateway = CARRIER_GATEWAYS.get(carrier_key)
+        if not gateway:
+            raise ValueError(
+                f"Unknown carrier '{carrier}'. "
+                f"Supported: {', '.join(sorted(CARRIER_GATEWAYS.keys()))}"
+            )
+        # Strip the + and country code prefix for US numbers
+        digits = re.sub(r"[^\d]", "", phone)
+        if digits.startswith("1") and len(digits) == 11:
+            digits = digits[1:]  # Remove leading 1
+        return f"{digits}@{gateway}"
+
+    def send(self, to_number, message, carrier=None):
+        if not carrier:
+            raise ValueError(
+                f"Carrier is required for email-to-SMS. "
+                f"Add 'carrier' field to contact with phone {to_number}"
+            )
+        to_email = self._get_gateway_address(to_number, carrier)
+
+        msg = MIMEText(message)
+        msg["From"] = self.email_address
+        msg["To"] = to_email
+        msg["Subject"] = ""  # Keep empty — shows as SMS, not email
+
+        with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+            server.starttls()
+            server.login(self.email_address, self.email_password)
+            server.sendmail(self.email_address, to_email, msg.as_string())
+
+        logging.info("[EMAIL-SMS] -> %s (%s)", to_email, to_number)
+        return {"status": "sent", "to": to_number, "via": to_email}
+
+
 class MockProvider(SMSProvider):
     """Mock provider for testing — no real SMS sent."""
 
-    def send(self, to_number, message):
+    def send(self, to_number, message, **kwargs):
         logging.info("[MOCK] -> %s: %s", to_number, message[:80])
         return {"status": "mock_sent", "to": to_number}
 
@@ -181,6 +254,13 @@ def create_provider(config):
             api_key=provider_cfg["account_sid"],
             api_secret=provider_cfg["auth_token"],
             from_number=provider_cfg["from_number"],
+        )
+    elif name == "email_sms":
+        return EmailSMSProvider(
+            smtp_server=provider_cfg.get("smtp_server", "smtp.gmail.com"),
+            smtp_port=int(provider_cfg.get("smtp_port", 587)),
+            email_address=provider_cfg["email_address"],
+            email_password=provider_cfg["email_password"],
         )
     elif name == "mock":
         return MockProvider()
@@ -212,11 +292,16 @@ def send_single(provider, contact, message, retry_attempts, retry_delay):
     if not validate_phone(phone):
         return {"contact": name, "phone": phone, "status": "invalid_number"}
 
+    carrier = contact.get("carrier")
+
     for attempt in range(1, retry_attempts + 1):
         try:
-            result = provider.send(phone, message)
+            if carrier:
+                result = provider.send(phone, message, carrier=carrier)
+            else:
+                result = provider.send(phone, message)
             return {"contact": name, "phone": phone, "status": "sent", "result": result}
-        except requests.exceptions.RequestException as exc:
+        except (requests.exceptions.RequestException, smtplib.SMTPException, ValueError) as exc:
             logging.warning(
                 "Attempt %d/%d failed for %s: %s", attempt, retry_attempts, name, exc
             )
